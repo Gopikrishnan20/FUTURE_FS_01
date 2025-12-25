@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import { adminAuth } from "./middleware/auth.js";
 
 dotenv.config();
 
@@ -11,7 +12,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Health check route
+// In-memory message store (no DB)
+const messages = [];
+
+// Health check
 app.get("/", (req, res) => {
   res.send("Backend is running");
 });
@@ -27,6 +31,15 @@ app.post("/contact", async (req, res) => {
   }
 
   try {
+    // 1️⃣ Store message in memory
+    messages.push({
+      name,
+      email,
+      message,
+      createdAt: new Date(),
+    });
+
+    // 2️⃣ Send email
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -50,17 +63,22 @@ ${message}
 
     res.status(200).json({
       success: true,
-      message: "Message sent successfully",
+      message: "Message received and email sent",
     });
   } catch (error) {
-    console.error("Email error:", error);
+    console.error("❌ Email error:", error);
     res.status(500).json({
       error: "Failed to send message",
     });
   }
 });
 
-// Server start
+// 🔒 Protected admin route (NO DATABASE)
+app.get("/messages", adminAuth, (req, res) => {
+  res.json(messages);
+});
+
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Backend running on http://localhost:${PORT}`);
